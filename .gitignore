@@ -33,3 +33,4 @@ wdIn.txt
 wdOut.txt
 downstream_releases/
 data/
+*.jsonl

@@ -15,6 +15,13 @@ structure Args where
   nPersons : Option Nat := none
   maxClauses : Nat := 8
   dist : String := ""
+  saturate : Bool := false
+  nMin : Nat := 2
+  nMax : Nat := 8
+  plateauWindow : Nat := 10000
+  plateauPct : Nat := 1
+  plateauBps : Nat := 0
+  maxPerN : Nat := 0
   deriving Inhabited
 
 def parseArgs (xs : List String) : Args :=
@@ -27,6 +34,13 @@ def parseArgs (xs : List String) : Args :=
     | "--n" :: n :: rest => go { a with nPersons := some (n.toNat!) } rest
     | "--max-clauses" :: m :: rest => go { a with maxClauses := m.toNat! } rest
     | "--dist" :: d :: rest => go { a with dist := d } rest
+    | "--saturate" :: rest => go { a with saturate := true } rest
+    | "--nmin" :: n :: rest => go { a with nMin := n.toNat! } rest
+    | "--nmax" :: n :: rest => go { a with nMax := n.toNat! } rest
+    | "--plateau-window" :: w :: rest => go { a with plateauWindow := w.toNat! } rest
+    | "--plateau-pct" :: p :: rest => go { a with plateauPct := p.toNat! } rest
+    | "--plateau-bps" :: b :: rest => go { a with plateauBps := b.toNat! } rest
+    | "--max-per-n" :: m :: rest => go { a with maxPerN := m.toNat! } rest
     | _ :: rest => go a rest
   go {} xs
 
@@ -118,6 +132,46 @@ def countsByDist (total : Nat) (dist : String) : List (Nat × Nat) :=
   else if dist = "skew" then countsSkew total
   else countsUniform total
 
+def saturateForN (h : IO.FS.Handle) (idStart : Nat) (n : Nat) (maxClauses : Nat)
+    (seed : Nat) (window : Nat) (pct : Nat) (bps : Nat) (maxPerN : Nat) : IO (Nat × RNG) := do
+  let cfg : GenConfig := { minPersons := n, maxPersons := n, maxClauses := maxClauses, seed := (USize.ofNat seed) }
+  let mut rng := RNG.ofSeed cfg.seed
+  let mut seenKey : Std.HashSet String := (Std.HashSet.emptyWithCapacity (if maxPerN = 0 then 1024 else maxPerN))
+  let mut produced := 0
+  let mut windowTries := 0
+  let mut windowNew := 0
+  let target := if maxPerN = 0 then Nat.pow 2 31 else maxPerN
+  while produced < target do
+    let (p, r1) := KNK.genUniq cfg rng
+    rng := r1
+    match KNK.solveUnique p with
+    | some sol =>
+        let key := puzzleKey p
+        if seenKey.contains key then
+          pure ()
+        else
+          seenKey := seenKey.insert key
+          let line := mkManifestLine (idStart + produced) p sol
+          h.putStr line
+          produced := produced + 1
+          windowNew := windowNew + 1
+    | none => pure ()
+    windowTries := windowTries + 1
+    if windowTries ≥ window then
+      if bps > 0 then
+        if windowNew * 10000 ≤ windowTries * bps then
+          break
+        else
+          windowTries := 0
+          windowNew := 0
+      else
+        if windowNew * 100 ≤ windowTries * pct then
+          break
+        else
+          windowTries := 0
+          windowNew := 0
+  pure (produced, rng)
+
 def generateForN (h : IO.FS.Handle) (idStart : Nat) (n : Nat) (k : Nat) (maxClauses : Nat) (seed : Nat) : IO (Nat × RNG) := do
   let cfg : GenConfig := { minPersons := n, maxPersons := n, maxClauses := maxClauses, seed := (USize.ofNat seed) }
   let mut rng := RNG.ofSeed cfg.seed
@@ -145,7 +199,21 @@ def main (argv : List String) : IO Unit := do
   ensureDir out
   let manifest := out / "manifest.jsonl"
   let h ← IO.FS.Handle.mk manifest IO.FS.Mode.write
-  if a.nPersons.isSome then
+  if a.saturate then
+    -- Saturate per N from nMin..nMax until plateau
+    let mut idBase := a.offset
+    let mut total := 0
+    for n in List.range (a.nMax + 1) do
+      if n < a.nMin || n < 2 then
+        pure ()
+      else
+        let seedN := a.seed + idBase + n*1000003
+        let (producedN, _) ← saturateForN h idBase n a.maxClauses seedN a.plateauWindow a.plateauPct a.plateauBps a.maxPerN
+        idBase := idBase + producedN
+        total := total + producedN
+    IO.FS.Handle.flush h
+    IO.println s!"Wrote {total} entries to {manifest}"
+  else if a.nPersons.isSome then
     -- single-N mode (backward compatible)
     let n := a.nPersons.get!
     let (produced, _) ← generateForN h a.offset n a.count a.maxClauses (a.seed + a.offset + n*1000003)
