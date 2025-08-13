@@ -18,5 +18,5 @@ lake exe knk --saturate --nmin 2 --nmax 8 --out all_puzzles
 
 Outputs to `data/NAME.jsonl` in format:
 ```json
-{"puzzle": "PropF.says 0 (PropF.isKnave 1), ...", "solution": "KNK"}
+{"puzzle": "says 0 (isKnave 1), ...", "solution": "KNK"}
 ```

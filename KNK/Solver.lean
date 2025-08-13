@@ -29,16 +29,16 @@ def solutionToString (s : Solution) : String :=
 def axiomsString (P : Puzzle) : String :=
   let rec pp (φ : PropF) : String :=
     match φ with
-    | .tt => "PropF.tt"
-    | .ff => "PropF.ff"
-    | .isKnight p => s!"PropF.isKnight {p}"
-    | .isKnave p => s!"PropF.isKnave {p}"
-    | .says p ψ => s!"PropF.says {p} (" ++ pp ψ ++ ")"
-    | .not ψ => s!"PropF.not (" ++ pp ψ ++ ")"
-    | .and a b => s!"PropF.and (" ++ pp a ++ ") (" ++ pp b ++ ")"
-    | .or a b => s!"PropF.or (" ++ pp a ++ ") (" ++ pp b ++ ")"
-    | .imp a b => s!"PropF.imp (" ++ pp a ++ ") (" ++ pp b ++ ")"
-    | .iff a b => s!"PropF.iff (" ++ pp a ++ ") (" ++ pp b ++ ")"
+    | .tt => "tt"
+    | .ff => "ff"
+    | .isKnight p => s!"isKnight {p}"
+    | .isKnave p => s!"isKnave {p}"
+    | .says p ψ => s!"says {p} (" ++ pp ψ ++ ")"
+    | .not ψ => s!"not (" ++ pp ψ ++ ")"
+    | .and a b => s!"and (" ++ pp a ++ ") (" ++ pp b ++ ")"
+    | .or a b => s!"or (" ++ pp a ++ ") (" ++ pp b ++ ")"
+    | .imp a b => s!"imp (" ++ pp a ++ ") (" ++ pp b ++ ")"
+    | .iff a b => s!"iff (" ++ pp a ++ ") (" ++ pp b ++ ")"
   P.axioms.map pp |>.intersperse ", " |>.foldl (· ++ ·) ""
 
 end KNK

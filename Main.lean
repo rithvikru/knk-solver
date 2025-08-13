@@ -99,6 +99,8 @@ def saturateForN (h : IO.FS.Handle) (idStart : Nat) (n : Nat) (maxClauses : Nat)
           h.putStr line
           produced := produced + 1
           windowNew := windowNew + 1
+          if produced % 10000 == 0 then
+            IO.println s!"{produced} puzzles generated"
     | none => pure ()
     windowTries := windowTries + 1
     if windowTries ≥ window then
@@ -128,6 +130,8 @@ def generateForN (h : IO.FS.Handle) (idStart : Nat) (n : Nat) (k : Nat) (maxClau
           let line := mkManifestLine (idStart + produced) p sol
           h.putStr line
           produced := produced + 1
+          if produced % 10000 == 0 then
+            IO.println s!"  Generated {produced} unique puzzles for n={n}..."
     | none => pure ()
   pure (produced, rng)
 
@@ -173,6 +177,8 @@ def main (argv : List String) : IO Unit := do
             let line := mkManifestLine (a.offset + produced) p sol
             h.putStr line
             produced := produced + 1
+            if produced % 10000 == 0 then
+              IO.println s!"  Generated {produced} unique puzzles..."
       | none => pure ()
     IO.FS.Handle.flush h
     IO.println s!"Wrote {produced} entries to {manifest}"
