@@ -42,7 +42,52 @@ namespace RNG
       (xs.getD i default, r')
 end RNG
 
-/- Ensure in-puzzle uniqueness: build up to `m` distinct clauses by resampling duplicates. -/
+private def genFormula (n : Nat) (depth : Nat) (r : RNG) : PropF × RNG :=
+  match depth with
+  | 0 =>
+    let (choice, r) := r.randNat 0 3
+    let (person, r) := r.randNat 0 (n - 1)
+    match choice with
+    | 0 => (PropF.isKnight person, r)
+    | 1 => (PropF.isKnave person, r)
+    | 2 => (PropF.tt, r)
+    | _ => (PropF.ff, r)
+  | depth' + 1 =>
+    let (choice, r) := r.randNat 0 4
+    match choice with
+    | 0 =>
+      let (subformula, r) := genFormula n depth' r
+      (PropF.not subformula, r)
+    | 1 =>
+      let (left, r) := genFormula n depth' r
+      let (right, r) := genFormula n depth' r
+      (PropF.and left right, r)
+    | 2 =>
+      let (left, r) := genFormula n depth' r
+      let (right, r) := genFormula n depth' r
+      (PropF.or left right, r)
+    | 3 =>
+      let (left, r) := genFormula n depth' r
+      let (right, r) := genFormula n depth' r
+      (PropF.imp left right, r)
+    | _ =>
+      let (left, r) := genFormula n depth' r
+      let (right, r) := genFormula n depth' r
+      (PropF.iff left right, r)
+
+private def genStatement (n : Nat) (maxDepth : Nat) (r : RNG) : PropF × RNG :=
+  let (speaker, r) := r.randNat 0 (n - 1)
+  let (depth, r) := r.randNat 0 maxDepth
+  let (nestedSays, r) := r.randNat 0 10
+
+  if nestedSays = 0 && depth > 0 then
+    let (innerSpeaker, r) := r.randNat 0 (n - 1)
+    let (innerFormula, r) := genFormula n (depth - 1) r
+    (PropF.says speaker (PropF.says innerSpeaker innerFormula), r)
+  else
+    let (formula, r) := genFormula n depth r
+    (PropF.says speaker formula, r)
+
 private def genUniqueClauses (n m : Nat) (r : RNG) : (List PropF) × RNG :=
   let rec fill (need : Nat) (acc : List PropF) (r : RNG) (fuel : Nat) : (List PropF) × RNG :=
     match need with
@@ -51,21 +96,12 @@ private def genUniqueClauses (n m : Nat) (r : RNG) : (List PropF) × RNG :=
       match fuel with
       | 0 => (acc, r)
       | fuel'+1 =>
-        let (a, r) := r.randNat 0 (n - 1)
-        let (b, r) := r.randNat 0 (n - 1)
-        let (c, r) := r.randNat 0 (n - 1)
-        let choices : List PropF :=
-          [ KNK.accusation a b
-          , KNK.affirmation a b
-          , KNK.sameType a b
-          , KNK.differentType a b
-          , KNK.knaveConjunction a b c
-          ]
-        let (cl, r) := RNG.choose r choices PropF.tt
-        if acc.contains cl then
+        let maxDepth := 3
+        let (statement, r) := genStatement n maxDepth r
+        if acc.contains statement then
           fill (need'+1) acc r fuel'
         else
-          fill need' (cl :: acc) r fuel'
+          fill need' (statement :: acc) r fuel'
   fill m [] r (m * 64)
 
 def genPuzzle (cfg : GenConfig) (r : RNG) : Puzzle × RNG :=
@@ -76,7 +112,6 @@ def genPuzzle (cfg : GenConfig) (r : RNG) : Puzzle × RNG :=
   let (clauses, r) := genUniqueClauses n m r
   ({ numPersons := n, axioms := clauses.reverse }, r)
 
-/-- Try up to `fuel` attempts to get a uniquely solvable puzzle; return first found. -/
 partial def genUniqAux (cfg : GenConfig) (r : RNG) (fuel : Nat) : Option (Puzzle × RNG) :=
   match fuel with
   | 0 => none

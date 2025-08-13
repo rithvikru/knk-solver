@@ -1,33 +1,22 @@
-## lean-knk
+# lean-knk
 
-Generate a large dataset (50M) of Knights & Knaves puzzles with deterministic Lean 4 solver outputs.
+Knights & Knaves puzzle generator with Lean 4 solver.
 
-### Prerequisites
-
-- Lean 4 toolchain (managed by `lean-toolchain`)
-- Lake build tool
-
-### Build
-
+## Build
 ```bash
 lake build
 ```
 
-### Generate dataset
-
+## Usage
 ```bash
-lake exe knk --out /tmp/knk-data --count 200000 --seed 42
+# Generate n=6 puzzles
+lake exe knk --n 6 --count 1000 --out n6_puzzles
+
+# Generate with saturation
+lake exe knk --saturate --nmin 2 --nmax 8 --out all_puzzles
 ```
 
-This writes a JSONL manifest containing pairs of Lean problem representations and solutions.
-
-### Structure
-
-- `KNK/Logic.lean` — puzzle DSL and semantics
-- `KNK/Solver.lean` — deterministic solver via exhaustive search
-- `KNK/Generator.lean` — randomized puzzle generation with difficulty controls
-- `Main.lean` — CLI to generate dataset
-
-### License
-
-MIT
+Outputs to `data/NAME.jsonl` in format:
+```json
+{"puzzle": "PropF.says 0 (PropF.isKnave 1), ...", "solution": "KNK"}
+```

@@ -2,12 +2,6 @@ import Std
 
 namespace KNK
 
-/--
-Basic domain for Knights & Knaves puzzles.
-Each inhabitant either always tells the truth (Knight) or always lies (Knave).
-Statements are propositional formulas over inhabitants and logical connectives.
--/
-
 inductive Role where
   | knight
   | knave
@@ -24,11 +18,8 @@ namespace World
     match w.roleOf p with
     | .knight => true
     | .knave => false
-
-  def isKnave (w : World) (p : PersonId) : Bool := !(w.isKnight p)
 end World
 
-/-! Propositional language over persons. -/
 inductive PropF where
   | tt
   | ff
@@ -50,12 +41,11 @@ namespace PropF
   infixr:25 " ↔ " => PropF.iff
 end PropF
 
-/-! Semantics: evaluate a formula in a world. -/
 partial def eval (w : World) : PropF → Bool
   | .tt => true
   | .ff => false
   | .isKnight p => w.isKnight p
-  | .isKnave p => w.isKnave p
+  | .isKnave p => !w.isKnight p
   | .says p φ =>
       let truthful := w.isKnight p
       let val := eval w φ
@@ -66,16 +56,14 @@ partial def eval (w : World) : PropF → Bool
   | .imp φ ψ => (! (eval w φ)) || (eval w ψ)
   | .iff φ ψ => (eval w φ) == (eval w ψ)
 
-/-- A puzzle is a finite set of inhabitants and a list of statements (formulas) that are asserted to be true. -/
 structure Puzzle where
   numPersons : Nat
   axioms : List PropF
   deriving Repr
 
 def Puzzle.satisfied (w : World) (P : Puzzle) : Bool :=
-  (P.axioms.all (fun φ => eval w φ))
+  P.axioms.all (fun φ => eval w φ)
 
-/-- Enumerate all possible worlds for `n` persons. -/
 def allWorlds (n : Nat) : List World :=
   let rec roleLists (k : Nat) : List (List Role) :=
     if k = 0 then [ [] ]
@@ -88,30 +76,7 @@ def allWorlds (n : Nat) : List World :=
     , roleOf := fun i => roles.getD i Role.knight
     })
 
-/-- Solutions are the worlds that satisfy all axioms. -/
 def solutions (P : Puzzle) : List World :=
   (allWorlds P.numPersons).filter (fun w => Puzzle.satisfied w P)
 
-/- Convenience constructors for common statement patterns. -/
-open PropF
-
-def accusation (a b : PersonId) : PropF :=
-  -- a says: b is a knave
-  .says a (.isKnave b)
-
-def affirmation (a b : PersonId) : PropF :=
-  -- a says: b is a knight
-  .says a (.isKnight b)
-
-def sameType (a b : PersonId) : PropF :=
-  .says a ((.isKnight a) ↔ (.isKnight b))
-
-def differentType (a b : PersonId) : PropF :=
-  .says a ((.isKnight a) ↔ (.isKnave b))
-
-def knaveConjunction (a b c : PersonId) : PropF :=
-  .says a ((.isKnave b) ∧ (.isKnave c))
-
 end KNK
-
-
